@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIOC 209 Exam Center</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  if (window.tailwind) tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { display: ['Fraunces', 'serif'], sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: {
+          ink: '#14213d', moss: { 50:'#f0f7f4', 100:'#d9ede3', 500:'#2f8f6b', 600:'#237556', 700:'#1b5c44' },
+          amber2: { 50:'#fff8eb', 500:'#e09f3e' }
+        }
+      }
+    }
+  }
+</script>
+<!-- Firebase (compat SDK via CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  body { background: #f6f4ef; }
+  .card { background:#fff; border:1px solid #e7e2d8; border-radius:1.25rem; box-shadow:0 1px 2px rgba(20,33,61,.04), 0 8px 24px -12px rgba(20,33,61,.12); }
+  .opt { transition: all .15s ease; }
+  .opt:hover:not(:disabled) { border-color:#2f8f6b; background:#f0f7f4; }
+  .opt.sel { border-color:#2f8f6b; background:#f0f7f4; box-shadow:0 0 0 3px rgba(47,143,107,.15); }
+  .opt.ok  { border-color:#16a34a; background:#ecfdf3; }
+  .opt.bad { border-color:#dc2626; background:#fef2f2; }
+  .chip { display:inline-flex; align-items:center; gap:.35rem; font-size:.72rem; font-weight:600; padding:.25rem .6rem; border-radius:999px; letter-spacing:.01em; }
+  .choice { transition: all .15s ease; }
+  .choice.active { border-color:#2f8f6b; background:#f0f7f4; box-shadow:0 0 0 3px rgba(47,143,107,.15); }
+  .fade { animation: fade .25s ease; }
+  @keyframes fade { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+  .hidden-view { display:none !important; }
+</style>
+</head>
+<body class="font-sans text-ink min-h-screen">
+
+<!-- ===================== HEADER ===================== -->
+<header class="sticky top-0 z-30 bg-[#f6f4ef]/90 backdrop-blur border-b border-[#e7e2d8]">
+  <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-moss-600 text-white grid place-items-center font-display font-bold">B</div>
+      <div>
+        <div class="font-display font-bold leading-tight">BIOC 209 Exam Center</div>
+        <div class="text-xs text-slate-500 leading-tight">Biochemistry · Merit University</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 py-8">
+
+  <!-- ===================== SETUP WIZARD ===================== -->
+  <section id="view-setup" class="fade">
+    <div class="max-w-2xl mx-auto">
+      <div class="mb-6">
+        <h1 class="font-display text-3xl sm:text-4xl font-bold">Formative MCQ Exam</h1>
+        <p class="text-slate-600 mt-2">Questions are drawn from the official BIOC 209 question bank, plus a few new questions built from lecture details. You'll get feedback after every answer.</p>
+      </div>
+
+      <!-- stepper -->
+      <div class="flex items-center gap-2 mb-5" id="stepper"></div>
+
+      <!-- welcome banner (shown after the name is entered) -->
+      <div id="welcome" class="hidden mb-5 rounded-2xl bg-moss-600 text-white px-6 py-5 fade">
+        <div class="font-display text-2xl font-bold" id="welcomeTitle"></div>
+        <div class="text-moss-50 mt-1 text-sm" id="welcomeSub"></div>
+      </div>
+
+      <div class="card p-6 sm:p-8">
+        <!-- Step 1 -->
+        <div data-step="1" class="step">
+          <h2 class="font-display text-xl font-bold mb-4">What should we call you?</h2>
+          <input id="studentName" type="text" maxlength="60" autocomplete="name" placeholder="Name"
+            class="w-full rounded-xl border border-[#d9d2c3] px-4 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-moss-100 focus:border-moss-500">
+          <p id="nameErr" class="text-sm text-red-600 mt-2 hidden">Please enter your name (at least 3 characters).</p>
+        </div>
+
+        <!-- Step 2 -->
+        <div data-step="2" class="step hidden">
+          <h2 class="font-display text-xl font-bold mb-1">Choose the scope</h2>
+          <p class="text-sm text-slate-500 mb-4">Test yourself on one lecture or the whole course.</p>
+          <div id="scopeChoices" class="grid gap-3"></div>
+        </div>
+
+        <!-- Step 3 -->
+        <div data-step="3" class="step hidden">
+          <h2 class="font-display text-xl font-bold mb-1">How many questions?</h2>
+          <p class="text-sm text-slate-500 mb-4" id="countHint"></p>
+          <div id="countChoices" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+          <div class="mt-5">
+            <label for="customCount" class="block text-sm font-semibold text-slate-700 mb-2">Or type the number of questions you want</label>
+            <div class="flex items-center gap-3">
+              <input id="customCount" type="number" inputmode="numeric" min="1" step="1" placeholder="e.g. 15"
+                class="w-36 rounded-xl border border-[#d9d2c3] px-4 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-moss-100 focus:border-moss-500">
+              <span class="text-sm text-slate-500" id="customMax"></span>
+            </div>
+            <p id="countErr" class="text-sm text-red-600 mt-2 hidden"></p>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div data-step="4" class="step hidden">
+          <h2 class="font-display text-xl font-bold mb-1">Select difficulty</h2>
+          <p class="text-sm text-slate-500 mb-4">If a level runs short for your scope, the exam is topped up from the nearest level.</p>
+          <div id="diffChoices" class="grid sm:grid-cols-3 gap-3"></div>
+          <div id="summaryBox" class="mt-6 rounded-xl bg-moss-50 border border-moss-100 p-4 text-sm"></div>
+        </div>
+
+        <div class="flex justify-between items-center mt-8">
+          <button id="backBtn" class="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-medium invisible">← Back</button>
+          <button id="nextBtn" class="px-6 py-2.5 rounded-xl bg-moss-600 hover:bg-moss-700 text-white font-semibold">Continue →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== EXAM ===================== -->
+  <section id="view-exam" class="hidden-view">
+    <div class="max-w-3xl mx-auto">
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="card px-4 py-3">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Question</div>
+          <div class="font-display text-2xl font-bold"><span id="qNum">1</span><span class="text-slate-400 text-lg">/<span id="qTotal">10</span></span></div>
+        </div>
+        <div class="card px-4 py-3">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Score</div>
+          <div class="font-display text-2xl font-bold text-moss-600"><span id="liveScore">0</span><span class="text-slate-400 text-lg"> correct</span></div>
+        </div>
+        <div class="card px-4 py-3">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Time</div>
+          <div class="font-display text-2xl font-bold tabular-nums" id="timer">00:00</div>
+        </div>
+      </div>
+      <div class="h-2 rounded-full bg-[#e7e2d8] overflow-hidden mb-5">
+        <div id="progressBar" class="h-full bg-moss-500 transition-all duration-300" style="width:0%"></div>
+      </div>
+
+      <div class="card p-6 sm:p-8 fade" id="qCard">
+        <div class="flex flex-wrap gap-2 mb-4" id="qTags"></div>
+        <h2 id="qText" class="text-lg sm:text-xl font-semibold leading-relaxed mb-5"></h2>
+        <div id="qOptions" class="grid gap-3"></div>
+        <div id="feedback" class="hidden mt-5 rounded-xl p-4 text-sm leading-relaxed"></div>
+        <div class="flex justify-end mt-6">
+          <button id="submitBtn" disabled class="px-6 py-2.5 rounded-xl bg-moss-600 hover:bg-moss-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold">Submit answer</button>
+          <button id="nextQBtn" class="hidden px-6 py-2.5 rounded-xl bg-ink hover:bg-slate-800 text-white font-semibold">Next question →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== RESULT ===================== -->
+  <section id="view-result" class="hidden-view">
+    <div class="max-w-3xl mx-auto">
+      <div class="card p-6 sm:p-10 text-center fade">
+        <div class="text-sm text-slate-500" id="resName"></div>
+        <div class="font-display text-6xl font-bold mt-2" id="resPct">0%</div>
+        <div class="text-slate-600 mt-1" id="resScore"></div>
+        <div class="mt-3 inline-block chip bg-moss-50 text-moss-700" id="resMsg"></div>
+        <div class="grid grid-cols-3 gap-3 mt-8 text-left">
+          <div class="rounded-xl bg-[#f6f4ef] p-3"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Scope</div><div class="font-semibold text-sm mt-0.5" id="resScope"></div></div>
+          <div class="rounded-xl bg-[#f6f4ef] p-3"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Difficulty</div><div class="font-semibold text-sm mt-0.5" id="resDiff"></div></div>
+          <div class="rounded-xl bg-[#f6f4ef] p-3"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Time taken</div><div class="font-semibold text-sm mt-0.5" id="resTime"></div></div>
+        </div>
+        <div id="saveStatus" class="mt-6 text-sm"></div>
+        <div class="flex flex-wrap gap-3 justify-center mt-6">
+          <button id="reviewToggle" class="px-5 py-2.5 rounded-xl border border-[#d9d2c3] hover:bg-[#f6f4ef] font-semibold">Review answers</button>
+          <button id="restartBtn" class="px-5 py-2.5 rounded-xl bg-moss-600 hover:bg-moss-700 text-white font-semibold">Take another exam</button>
+        </div>
+      </div>
+      <div id="reviewList" class="hidden mt-5 grid gap-3"></div>
+    </div>
+  </section>
+
+  <!-- ===================== ADMIN DASHBOARD ===================== -->
+  <section id="view-admin" class="hidden-view">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+      <div>
+        <div class="chip bg-ink text-white mb-2">ADMIN</div>
+        <h1 class="font-display text-3xl font-bold">Results Dashboard</h1>
+        <p class="text-slate-500 text-sm mt-1" id="adminMode"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="exportCsv" class="px-4 py-2 rounded-xl border border-[#d9d2c3] bg-white hover:bg-[#f6f4ef] text-sm font-semibold">Export CSV</button>
+        <button id="adminLogout" class="px-4 py-2 rounded-xl bg-ink text-white text-sm font-semibold">Lock &amp; exit</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Test-takers</div><div class="font-display text-3xl font-bold" id="stTakers">0</div><div class="text-xs text-slate-400">unique names</div></div>
+      <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Attempts</div><div class="font-display text-3xl font-bold" id="stAttempts">0</div><div class="text-xs text-slate-400">exams submitted</div></div>
+      <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Average</div><div class="font-display text-3xl font-bold" id="stAvg">–</div><div class="text-xs text-slate-400">mean percentage</div></div>
+      <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Pass rate</div><div class="font-display text-3xl font-bold" id="stPass">–</div><div class="text-xs text-slate-400">scored ≥ 50%</div></div>
+    </div>
+    <div class="card overflow-hidden">
+      <div class="p-4 border-b border-[#e7e2d8] flex flex-wrap gap-3 items-center justify-between">
+        <input id="adminSearch" placeholder="Search by student name…" class="rounded-lg border border-[#d9d2c3] px-3 py-2 text-sm w-full sm:w-72 focus:outline-none focus:ring-4 focus:ring-moss-100">
+        <div class="flex items-center gap-2 text-xs text-slate-500"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live updates</div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-[#f6f4ef] text-left text-[11px] uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="px-4 py-3">#</th><th class="px-4 py-3">Student</th><th class="px-4 py-3">Date &amp; time</th>
+              <th class="px-4 py-3">Scope</th><th class="px-4 py-3">Difficulty</th><th class="px-4 py-3 text-right">Score</th><th class="px-4 py-3 text-right">%</th>
+            </tr>
+          </thead>
+          <tbody id="adminRows"></tbody>
+        </table>
+      </div>
+      <div id="adminEmpty" class="p-10 text-center text-slate-400 hidden">No results yet.</div>
+    </div>
+  </section>
+</main>
+
+<!-- ===================== CONFIG + DATA + APP ===================== -->
+<script>
+/* =====================================================================
+   1) FIREBASE CONFIGURATION — paste your project's web config here.
+   ---------------------------------------------------------------------
+   Leave apiKey empty to run in DEMO mode (results stored only in this
+   browser's localStorage — fine for testing, NOT for real use).
+
+   SECURITY MODEL (real mode):
+   - Students can only CREATE a result document (cannot read anything).
+   - There is no visible admin button. Typing the passcode into the
+     student-name field and pressing Continue opens the dashboard; in real
+     mode it also signs in to Firebase Auth as ADMIN_EMAIL with the
+     passcode as the password, so the data is protected by Firestore rules.
+   Setup:
+     a) Firebase console → Authentication → enable Email/Password →
+        add user  ADMIN_EMAIL  with your passcode as its password
+     b) Firestore Database → create database → Rules → paste:
+
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /exam_results/{docId} {
+         allow create: if request.resource.data.keys().hasOnly(
+             ['studentName','scope','scopeLabel','difficulty','score','total',
+              'percentage','durationSec','timestamp','clientTime'])
+           && request.resource.data.studentName is string
+           && request.resource.data.studentName.size() > 1
+           && request.resource.data.studentName.size() <= 60
+           && request.resource.data.score is int
+           && request.resource.data.total is int
+           && request.resource.data.score >= 0
+           && request.resource.data.score <= request.resource.data.total
+           && request.resource.data.timestamp == request.time;
+         allow read, update, delete: if request.auth != null
+           && request.auth.token.email == 'admin@bioc209.app';
+       }
+     }
+   }
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCJqfG042jw_bA3L_6vdMYja11re16Cx48",
+  authDomain: "bioc209-exam.firebaseapp.com",
+  projectId: "bioc209-exam",
+  storageBucket: "bioc209-exam.firebasestorage.app",
+  messagingSenderId: "877329298616",
+  appId: "1:877329298616:web:17e96833f8c3bd257c704d"
+};
+const ADMIN_EMAIL = "admin@bioc209.app";      // must match the rules above
+const COLLECTION  = "exam_results";
+// SHA-256 of the passcode (the plain passcode is never stored in this file)
+const PASS_HASH = "c65fee33c7c6897d28bbb7128cbc38f79f56f8d2c71f98cb3c9a26e8ca0618cf";
+const LECTURE_SHARE = 0.13;                    // ~13% new lecture-based questions per exam
+
+/* =====================================================================
+   2) QUESTION DATA
+   Bank questions: B(scope, bankSection, bankNo, difficulty, question, options, answerIndex, explanation, note?)
+   New lecture questions: N(scope, lectureLabel, difficulty, question, options, answerIndex, explanation)
+   scope keys: L1, L2, L34, L56
+   ===================================================================== */
+const QUESTIONS = [];
+let _id = 0;
+function B(scope, sec, no, diff, q, o, a, e, note) { QUESTIONS.push({ id: ++_id, scope, src: 'bank', tag: `Question Bank · ${sec} Q${no}`, diff, q, o, a, e, note }); }
+function N(scope, lec, diff, q, o, a, e) { QUESTIONS.push({ id: ++_id, scope, src: 'lecture', tag: `${lec} · New`, diff, q, o, a, e }); }
+
+/* ---------- Lecture 1 – Overview of cell biochemistry (bank) ---------- */
+B('L1','Lec 1',1,'easy',"More than 40 human diseases are caused by problems with these organelles, which normally have important enzymes for breaking down substances that can build up in cells. Which organelle is being described?",["Vacuole","Cell membrane","Lysosome","Chloroplast","Mitochondria"],2,"Lysosomes are rich in hydrolytic enzymes. In lysosomal diseases one or more of these enzymes is absent, so materials accumulate inside the cell.");
+B('L1','Lec 1',2,'easy',"Humans who have disorders of these organelles often feel lethargic, as though they have no energy. Which organelle is being described?",["Peroxisome","Mitochondria","Cell membrane","ATP"],1,"Mitochondria produce energy as ATP (electron transport, oxidative phosphorylation, citric-acid cycle), so their disorders cause fatigue.");
+B('L1','Lec 1',3,'medium',"Cells undergo ………….. if cell membrane is damaged or due to decreased oxygen supply (hypoxia) and lack of ATP production",["Programmed cell death","Necroptosis","Atrophy","Necrosis"],3,"Necrosis is uncontrolled cell death caused by membrane damage, hypoxia, or blocked ATP production.");
+B('L1','Lec 1',4,'medium',"It plays crucial role in tissue sculpting, pattern formation and tissue homeostasis",["Programmed cell death","Necroptosis","Atrophy","Necrosis"],0,"Programmed cell death (apoptosis) is genetically controlled and removes aged or unwanted cells during tissue turnover and development.");
+B('L1','Lec 1',5,'medium',"Dysregulation of …………..enzymes is involved in spreading of cancer",["Ribosomal","Mitochondrial","Nuclear","Lysosomal","All the above"],3,"Lysosomal proteases such as cathepsins are implicated in cancer etiology and metastasis.");
+B('L1','Lec 1',6,'hard',"Accumulation of …………....is due to lack of peroxisomes",["Oxidative metabolites","Waste","Proteins","Fats","All the above"],0,"Peroxisomes handle oxidative reactions; when they are lacking, oxidative metabolites accumulate.");
+B('L1','Lec 1',7,'easy',"…………….is involved in protein synthesis",["Mitochondria","Ribosome","Lipid bilayer","Vacuoles","All the above"],1,"Ribosomes (RNA–protein complexes), together with the rough ER, carry out protein synthesis.");
+B('L1','Lec 1',8,'easy',"You would expect higher number of mitochondria and ribosomes in …………..",["Adipose tissues","Brain","Skin","Muscles","All the above"],3,"Mitochondrial number and size are higher in metabolically active tissues such as muscle.");
+B('L1','Lec 1',9,'hard',"Proteins may account more of cell weight in cells like ……..",["White blood cells","Immune cells","Beta cells","Muscles","Erythrocytes"],4,"Erythrocytes are packed with hemoglobin and lack a nucleus and most organelles, so protein makes up an unusually large share of their weight.");
+B('L1','Lec 1',10,'medium',"25-30% of the cell weight is .……..",["Cytosol","Proteins","Water","DNA"],1,"Water makes up 70–75% of cell weight; high-molecular-weight organic macromolecules (proteins, nucleic acids, polysaccharides, lipids) make up 25–30%.","The bank lists 'b or e' for this item; only the 'Proteins' version is used here.");
+B('L1','Lec 1',11,'easy',"………….are involved in bone remodeling and intracellular digestion",["Nuclear proteins","Peroxisomes","Water","Lysosomal enzymes","Autophagosomes"],3,"Lysosomal enzymes are active in bone remodeling and intracellular digestion.");
+B('L1','Lec 1',12,'easy',"The largest percentage of body water is located in what compartment?",["Intracellular fluid","Interstitial fluid","Extracellular fluid","Blood plasma","Transcellular fluid"],0,"About 28 L of the ~42 L of body water (≈67%) is intracellular fluid.");
+B('L1','Lec 1',13,'easy',"The most prevalent electrolyte in the extracellular fluid is…………..",["Potassium","Sodium","Calcium","Phosphate"],1,"ECF contains large quantities of Na⁺, Cl⁻ and HCO₃⁻; K⁺ dominates the ICF.");
+B('L1','Lec 1',14,'medium',"Electrolyte balance in the body usually refers to the balance of",["Organic molecules","Salts","Acids","Bases","All the above"],1,"Electrolytes are dissolved salts (ions such as Na⁺, K⁺, Cl⁻, HCO₃⁻).");
+B('L1','Lec 1',15,'hard',"Which of the following is false about hydrophobic effects in water?",["Generally, it is only nonpolar substances which exhibit hydrophobic effects","They can occur in a non-aqueous environment","Cell membranes are held together in part by hydrophobic effects","Hydrophobic groups are not precisely bonded to each other, but rather are held together because of a repulsion from water"],1,"The hydrophobic effect depends on water — nonpolar groups cluster because they are excluded by water, so it cannot occur in a non-aqueous environment.");
+B('L1','Lec 1',34,'easy',"Lemonade-Water, lemon juice, sugar, identify the solute",["Lemonade","Juice","Sugar","Water"],2,"The solute is the substance dissolved (sugar); water is the solvent and lemonade is the solution.");
+B('L1','Lec 1',35,'hard',"Lysosomes contain mainly",["Hydrolases","Lipases","Proteases","Cathepsins"],2,"The course key gives proteases — the lecture highlights lysosomal proteases (e.g. cathepsins) among the hydrolytic enzymes active at acidic pH.","Answer follows the course key.");
+
+/* ---------- Lecture 2 – Monosaccharides (bank items from the Lecture 1 set) ---------- */
+B('L2','Lec 1',16,'easy',"The general formula of monosaccharides is",["Cn H2n On","C2n H2 On","Cn H2 O2n","CnH2nO2n"],0,"Carbohydrates follow the empirical formula (CH₂O)n = CnH2nOn, with n ≥ 3.");
+B('L2','Lec 1',17,'medium',"The aldose sugar is",["Glycerose","Ribulose","Erythrulose","Dihydroxyacetone"],0,"Glycerose (glyceraldehyde) has an aldehyde carbonyl group; the others are ketoses.");
+B('L2','Lec 1',18,'medium',"A triose sugar is",["Glycerose","Ribose","Fructose","Ribulose"],0,"Glycerose (glyceraldehyde) has 3 carbons; ribose and ribulose are pentoses, fructose a hexose.");
+B('L2','Lec 1',19,'easy',"Polysaccharides are",["Polymers","Proteins","Acids","Oils"],0,"Polysaccharides are polymers of many monosaccharide units joined by glycosidic bonds.");
+B('L2','Lec 1',20,'hard',"The numbers of isomers of glucose is",["2","4","8","16"],3,"Glucose has 4 asymmetric carbons, so 2⁴ = 16 stereoisomers.");
+B('L2','Lec 1',21,'medium',"α-D-glucose and β-D-glucose are",["Isomers","Epimers","Anomers","Keto-Aldo pairs"],2,"They differ only in configuration at the anomeric carbon (C1), so they are anomers.");
+B('L2','Lec 1',22,'medium',"The most important epimer of glucose is",["Galactose","Fructose","Xylose","Arabinose"],0,"Galactose is the C-4 epimer of glucose.");
+B('L2','Lec 1',23,'easy',"The sugar found in DNA is",["Xylose","Ribose","Deoxyribose","Ribulose"],2,"2-Deoxyribose is the deoxy sugar component of DNA.");
+B('L2','Lec 1',24,'easy',"The sugar found in RNA is",["Xylose","Ribose","Deoxyribose","Ribulose"],1,"RNA contains ribose.");
+B('L2','Lec 1',25,'easy',"A polysaccharide that is often called an animal starch is",["Starch","Glycogen","Inulin","Insulin"],1,"Glycogen is the major storage form of glucose in animals (liver and muscle).");
+B('L2','Lec 1',26,'medium',"The carbon atom which becomes asymmetric when the straight chain form of monosaccharide changes into ring form is known as",["Anomeric carbon atom","Epimeric carbon atom","Isomeric carbon atom","None of these"],0,"On cyclization, the carbonyl carbon (C1 in aldoses, C2 in ketoses) becomes asymmetric — the anomeric carbon.");
+B('L2','Lec 1',27,'medium',"Which of the following is an epimeric pair?",["Glucose and fructose","Glucose and mannose","Galactose and fructose","Lactose and maltose"],1,"Glucose and mannose differ only at C-2 (C-2 epimers).");
+B('L2','Lec 1',28,'hard',"N-acetylglucosamine is present in",["Hyaluronic acid","Chondroitin sulfate","Heparin","All of these"],0,"Hyaluronic acid repeats β-glucuronic acid + N-acetylglucosamine; chondroitin sulfate uses N-acetylgalactosamine.");
+B('L2','Lec 1',29,'medium',"The predominant form of glucose in solution is",["Acyclic form","Hydrated acyclic form","Glucopyranose","Glucofuranose"],2,"In solution glucose exists mainly as the six-membered pyranose ring.");
+B('L2','Lec 1',30,'hard',"α- D glucuronic acid is present in",["Hyaluronic acid","Chondroitin sulfate","Heparin","All of these"],2,"Heparin's repeating unit contains glucosamine with either iduronic or glucuronic acid (sulfated).","Answer follows the course key.");
+B('L2','Lec 1',31,'easy',"Starch is a",["Polysaccharides","Monosaccharides","Disaccharides","Oligosaccharides"],0,"Starch (amylose + amylopectin) is a homopolysaccharide of glucose.");
+B('L2','Lec 1',32,'medium',"In glucose, the orientation of the -H and -OH groups around carbon atom number 5 adjacent to the terminal primary carbon determines",["D or L series","Dextrorotatory or levorotatory","α or β anomers","None of the above"],0,"The –OH on the asymmetric carbon farthest from the carbonyl (C5) is on the right in D-sugars and on the left in L-sugars.");
+B('L2','Lec 1',33,'hard',"What type of bond is formed between a monosaccharide and asparagine residue of a polypeptide chain?",["O-type glycosidic bond","N-type glycosidic bond","Disulfide bond","Amide bond"],1,"N-glycosidic bonds form between sugars and –NH₂ groups of amino-acid side chains (e.g. asparagine); O-glycosidic bonds form with –OH groups.");
+B('L2','Lec 1',37,'medium',"Two sugars which differ from one another only in configuration around a single carbon atom are termed",["Epimers","Anomers","Optical isomers","Stereoisomers"],0,"Isomers differing at one carbon only (other than the carbonyl) are epimers.");
+B('L2','Lec 1',38,'hard',"Isomers differing as a result of variations in configuration of the —OH and —H on carbon atoms 2, 3 and 4 of glucose are known as….",["Optical isomers","Epimers","Stereoisomers","Enantiomers"],0,"Variation at several asymmetric carbons (2, 3 and 4) gives optical isomers; a difference at a single carbon would be an epimer.","Answer follows the course key.");
+B('L2','Lec 1',39,'hard',"α-glycosidic bond is present in",["α-D-glucofuranose","β-D-glucofuranose","α-D-glucopyranose","All the above"],3,"Glycosidic bonds form at the anomeric carbon, which exists in all of these ring forms.","Answer follows the course key (duplicate option replaced).");
+B('L2','Lec 1',40,'medium',"Glucuronic acid is a derived product of the oxidation of glucose in",["The anomeric carbon","The asymmetric carbon","The carbonyl carbon","Carbon atom 6 in the backbone"],3,"Glucuronic (uronic) acid comes from oxidation of the terminal –OH group on C6.");
+B('L2','Lec 1',41,'hard',"Gluconic acid is a derived product of the oxidation of glucose in",["The anomeric carbon","The asymmetric carbon","The carbonyl carbon","Carbon atom 6 in the backbone"],0,"Gluconic acid comes from oxidation of the aldehyde group at C1 — the anomeric carbon.");
+B('L2','Lec 1',42,'easy',"Amylose is a constituent of",["Starch","Glycogen","Cellulose","None of the above"],0,"Starch = amylose (straight α1→4 chain) + amylopectin (branched).");
+
+/* ---------- Lectures 3 & 4 – Disaccharides & polysaccharides (bank) ---------- */
+B('L34','Lec 3&4',1,'medium',"Mucopolysaccharides are accumulated in a disease state caused by:",["An increased rate of synthesis of proteoglycans.","The synthesis of polysaccharides with an altered structure.","Defects in the degradation of proteoglycans.","The synthesis of abnormally small amounts of protein cores."],2,"Mucopolysaccharidoses are lysosomal storage diseases: defective degradation lets GAGs accumulate.");
+B('L34','Lec 3&4',2,'hard',"Which one of the following statements best describes glucose?",["It is a ketose and usually exists as a furanose ring in solution.","It is a C-4 epimer of galactose.","It is used in biological systems only in the L-isomeric form.","It is produced from dietary starch by the action of α-amylase."],1,"Glucose and galactose differ only at C-4. Glucose is an aldose, a pyranose in solution, and used in the D form.");
+B('L34','Lec 3&4',3,'medium',"Branching occurs in glycogen approximately after every",["Five glucose units","Ten glucose units","Fifteen glucose units","Twenty glucose units"],1,"Glycogen has α(1→6) branches about every 8–10 glucose units — more branched than amylopectin (20–30).");
+B('L34','Lec 3&4',4,'medium',"Which of the following is not reducing sugar?",["Lactose","Maltose","Galactose","Glycogen"],3,"Glycogen is a large polysaccharide with essentially no free anomeric carbon available; lactose, maltose and galactose are reducing.");
+B('L34','Lec 3&4',5,'easy',"A disaccharide linked by α-1-4 Glycosidic linkages is",["Lactose","Cellulose","Sucrose","Maltose"],3,"Maltose = two glucose units joined by α(1→4).");
+B('L34','Lec 3&4',6,'easy',"The carbohydrates reserved in human body is",["Glycogen","Glucose","Proteins","Inulin"],0,"Glycogen is the storage carbohydrate of animals, mainly in liver and muscle.");
+B('L34','Lec 3&4',7,'medium',"Which of the following is not a polymer of glucose",["Amylose","Inulin","Cellulose","Dextrin"],1,"Inulin is made of fructose units.");
+B('L34','Lec 3&4',8,'hard',"Reducing ability of carbohydrates is due to",["Free OH group","Ring structure","Hemi-acetal group","Enediol formation"],0,"Reducing ability depends on a free (unbound) anomeric –OH group, which lets the aldehyde/keto group be oxidized.","Answer follows the course key.");
+B('L34','Lec 3&4',9,'medium',"The stable ring formation in D-glucose involves",["C1 and C4","C1 and C2","C1 and C5","C2 and C5"],2,"The C1 aldehyde reacts with the C5 hydroxyl to form the six-membered pyranose ring.");
+B('L34','Lec 3&4',10,'easy',"α−D-Glucose and β−D-glucose are related by",["Epimers","Multirotation","Anomers","Ketoenol pair"],2,"They differ only at the anomeric carbon — anomers.");
+B('L34','Lec 3&4',11,'easy',"Epimers of glucose is",["Fructose","Galactose","Ribose","Deoxyribose"],1,"Galactose is the C-4 epimer of glucose.");
+B('L34','Lec 3&4',12,'medium',"Glucosamine is an important constituent of",["Homopolysaccharide","Heteropolysaccharide","Mucopolysaccharide","Dextran"],2,"Amino sugars such as glucosamine are components of mucopolysaccharides (GAGs).");
+B('L34','Lec 3&4',13,'easy',"Galactose is a main constituent of",["Milk sugar","Cane sugar","Honey","Chitin"],0,"Lactose (milk sugar) = galactose + glucose.");
+B('L34','Lec 3&4',14,'easy',"Starch and glycogen are polymers of",["Fructose","α−D-Glucose","Mannose","Galactose"],1,"Both are homopolysaccharides of α-D-glucose.");
+B('L34','Lec 3&4',15,'medium',"Polysaccharides",["Contain many monosaccharide units which may or may not be of the same kind","Function mainly a storage or structural compounds","Are present in large amounts in connective tissues and cartilages","All of these"],3,"All three statements are true (homo- vs hetero-polysaccharides; storage/structure; GAGs in connective tissue).");
+B('L34','Lec 3&4',16,'medium',"The following examples are important heteropolysaccharides except",["Amylopectin","Peptidoglycan","Heparin","Hyaluronic acid"],0,"Amylopectin contains only glucose, so it is a homopolysaccharide.");
+B('L34','Lec 3&4',17,'medium',"The tissues with the highest total glycogen content are",["Muscles","Pancreas","Blood","None of the above"],0,"Because of their large mass, muscles hold the greatest total amount of glycogen (liver has the higher concentration).");
+B('L34','Lec 3&4',18,'hard',"In place of glucuronic acid chondroitin sulphate B contains",["Gluconic acid","Gulonic acid","Induronic acid","Sulphonic acid"],3,"The course key gives sulphonic acid (the sulfate group), linked to the definition of type B as chondroitin-6-sulfate.","Answer follows the course key; many textbooks give iduronic acid for chondroitin sulfate B (dermatan sulfate).");
+B('L34','Lec 3&4',19,'medium',"N-acetylneuraminic acid is an example of",["Sialic acid","Mucic acid","Glucuronic acid","Hippuric acid"],0,"Sialic acids are acyl derivatives of neuraminic acid, e.g. N-acetylneuraminic acid (NANA).");
+B('L34','Lec 3&4',20,'hard',"Why is lactose classified as a reducing sugar, whereas sucrose is classified as a non-reducing sugar?",["Lactose retains a free, unengaged anomeric carbon atom on its glucose moiety that can mutarotate, while sucrose has both anomeric carbons involved in the glycosidic bond.","Lactose contains a keto group instead of an aldehyde group, making it reactive to oxidizing agents.","Sucrose has a free hemiacetal group on its fructose unit that is blocked by steric hindrance.","Lactose lacks any glycosidic bonds, leaving all hydroxyl groups free to reduce metal ions."],0,"In sucrose both anomeric carbons (glucose C1 and fructose C2) are used in the bond; lactose keeps the glucose anomeric carbon free.");
+B('L34','Lec 3&4',21,'medium',"Sucrose is composed of which two monosaccharides, and what is notable about its linkage regarding anomeric carbons?",["Glucose and galactose linked via a β (1-to-4) bond.","Glucose and mannose linked via an alpha(1-to-6) bond.","Glucose and fructose linked through both of their anomeric carbons (α-D-glucopyranosyl-(1-to-2)-β-D fructofuranoside).","Two fructose units linked via a beta(2-to-1) bond."],2,"Sucrose = O-α-D-glucopyranosyl-(1→2)-β-D-fructofuranose; both anomeric carbons are engaged, so it is non-reducing.");
+B('L34','Lec 3&4',22,'medium',"They are known as carbohydrates that contain three to ten monosaccharide units bonded to each other via glycosidic linkages.",["Oligopolysaccharides","Mucopolysaccharides","Ketotriose","Aldotriose"],0,"Oligosaccharides contain a small number of monosaccharide units (classically 3–10).");
+B('L34','Lec 3&4',23,'medium',"It is a branched glucose polymer and accounts for 80%-85% of the starch.",["Amylopectin","Amylose","Cellulose","Hyaluronic acid"],0,"Amylopectin is the branched (α1→4 + α1→6) component and the major fraction of starch.");
+B('L34','Lec 3&4',26,'hard',"Hyaluronic acid is an example of",["Chondroitin sulfate","Heparin","N-acetylglucosamine","All of these"],2,"Hyaluronic acid's repeating unit is β-glucuronic acid + N-acetylglucosamine.");
+B('L34','Lec 3&4',27,'hard',"The predominant form of fructose in solution is",["Acyclic form","Hydrated acyclic form","Glucopyranose","Glucofuranose"],3,"Fructose, a ketohexose, forms a five-membered furanose ring (C2 with C5).");
+B('L34','Lec 3&4',28,'easy',"Glycogen contains what alpha linkages?",["α (1-4), α(1-6)","β 1-4 glucosidic bond","α 1-4 glucosidic bond","None of the above"],0,"Glycogen chains are α(1→4) with α(1→6) branch points.");
+B('L34','Lec 3&4',29,'medium',"Highly viscous hyaluronic acid solutions serve as what?",["Lubricants in the fluid of joints","Anticoagulant","Vitreous body of the eye","All the above"],0,"Hyaluronic acid is the lubricant of synovial fluid. 'All the above' fails because anticoagulation is heparin's role.");
+B('L34','Lec 3&4',30,'hard',"In heparin, what Monosaccharides are present in it's disaccharide repeating unit?",["Sulfate derivative L-glucoronate","Sulfate derivative D-glucoronate","Sulfate derivative D-gluconate","Sulfate derivative of L-iduronate only"],1,"Heparin contains sulfated glucosamine with uronic acid (glucuronate/iduronate); the key gives sulfated D-glucuronate.","Answer follows the course key (duplicate option replaced).");
+
+/* ---------- Lectures 5 & 6 – Lipids (bank) ---------- */
+B('L56','Lec 5&6',1,'easy',"Sphingosine is an example of …………..",["Sugar Alchol","Amino alchol","Sugar acid","Amino acid"],1,"Sphingosine is the amino alcohol of sphingolipids such as sphingomyelin.");
+B('L56','Lec 5&6',2,'easy',"A product of hydrolysis of simple and compound lipids",["Phospholipids","Waxes","Fatty acids","Lipoproteins"],2,"Derived lipids (fatty acids, steroids, etc.) are the products of hydrolysis of simple and compound lipids.");
+B('L56','Lec 5&6',3,'easy',"This class of fatty acids cannot be synthesized in humans",["Tripalimitin","ω3 and ω6 fatty acids","Saturated fatty acids","Rancid oils"],1,"Humans lack enzymes to introduce double bonds beyond C9, so ω-3 and ω-6 PUFAs are essential.");
+B('L56','Lec 5&6',4,'easy',"Lipase is ………………",["An enzyme that hydrolyzes lipids","An enzyme that polymerizes fatty acids to form lipids","An enzyme that hydrolyzes proteins","None of the above"],0,"Lipases hydrolyze triglycerides during digestion and adipose mobilization.");
+B('L56','Lec 5&6',5,'easy',"Triacylglycerols are esters of…….………..",["Glycerol reaction with water","Glycerol reaction with NaOH","Glycerol reaction with fatty acids","Glycerol reaction with KOH"],2,"TAGs are three fatty acids esterified with glycerol.");
+B('L56','Lec 5&6',6,'easy',"Vitamins A, D, E, K are examples of ………………",["Water soluble vitamins","Triacylglycerols","Diacylglycerols","Fat soluble vitamins"],3,"A, D, E and K are fat-soluble; lipids help their absorption.");
+B('L56','Lec 5&6',7,'easy',"…..………Act as electrical and thermal insulators of neurones",["Monosaccharides","Glycoproteins","Lipids","DNA and RNA"],2,"Lipids insulate electrically in neurons (myelin) and thermally in subcutaneous tissue.");
+B('L56','Lec 5&6',8,'medium',"Fatty acids contain hydrophilic (COOH) group, and hydrophobic hydrocarbon chain, this is why they are…………",["Hydrophilic","Hydrophobic","Amphipathic","Amphiphobic and Amphiphilic"],2,"Having both a polar head and a nonpolar tail makes a molecule amphipathic.");
+B('L56','Lec 5&6',9,'medium',"Polyunsaturated fatty acids (PUFA) are dietary essentials to humans, which one of the following is PUFA?",["Cis-trans free fatty acids","Oleic acid","Triacylglycerols","Linoleic acid"],3,"Linoleic acid (ω-6) is a PUFA; oleic acid is monounsaturated.");
+B('L56','Lec 5&6',10,'hard',"Which one of the following is a major vehicle for the transport of cholesterol in blood?",["VLDL","LDL","HDL","All the above"],3,"Cholesterol is carried by lipoproteins — VLDL, LDL and HDL all participate.");
+B('L56','Lec 5&6',11,'easy',"Lipolysis of triacylglycerol (TAGs) is achieved by which enzymes?",["Collagenases","Lipases","Proteases","Isomerases"],1,"Lipases hydrolyze TAG → DAG → MAG → glycerol + 3 fatty acids.");
+B('L56','Lec 5&6',12,'medium',"Which of the following occurs when hydrogen is reacted with vegetable oil?",["The hydrogenated vegetable oil will contain fewer trans fats","The hydrogenated vegetable oil will become solid at room temperature","The hydrogenated vegetable oil will become polarized","The hydrogenated vegetable oil will become a saturated fat"],1,"Hydrogenation ('hardening') converts liquid oil to solid fat such as margarine.");
+B('L56','Lec 5&6',13,'easy',"Which of the following is a characteristic of lipids?",["They are composed of nitrogenous chains","They are not soluble in water","They are either fats or oils","They are polar molecules"],1,"Lipids are insoluble in water but soluble in organic solvents (chloroform, ether, benzene).");
+B('L56','Lec 5&6',14,'medium',"Triglycerides are……..",["Ethers","Alchols","Acids","Esters"],3,"Triglycerides are esters of glycerol with three fatty acids.");
+B('L56','Lec 5&6',15,'hard',"Olive oil has ………..pH",["Acidic","Alkaline","Neutral","None of the above"],2,"Triacylglycerols are neutral because the polar –OH and –COOH groups are tied up in ester linkages.","Answer follows the course key.");
+B('L56','Lec 5&6',16,'medium',"Why is butter a solid at room temperature, while vegetable oil is a liquid?",["Butter is a saturated fat and vegetable oil is an unsaturated fat","Butter is a polar molecule and vegetable oil is a nonpolar molecule","Butter is an unsaturated fat and vegetable oil is a saturated fat","Butter is a nonpolar molecule and vegetable oil is a polar molecule"],0,"Saturated (animal) fats are solid; unsaturated fats have kinks that lower the melting point, so plant oils are liquid.");
+B('L56','Lec 5&6',17,'medium',"A fat that is plentiful in the neural cells that make up the brain?",["Oleic acid","Palmitic acid","Butter","Cholesterol"],3,"Cholesterol is abundant in brain and nervous tissue membranes.");
+B('L56','Lec 5&6',18,'easy',"…………is a plentiful source of essential fatty acids",["Red salmon","Bread","Coca Cola","All the above"],0,"Oily fish like salmon are rich in ω-3 essential fatty acids.");
+B('L56','Lec 5&6',19,'medium',"What fat does the body use to synthesize important compounds, including sex hormones (estrogen, androgen, and progesterone), bile, adrenal hormones, and vitamin D?",["Oils","Waxes","Cholesterol","Grease"],2,"Cholesterol is the precursor of steroid hormones, bile acids and vitamin D.");
+B('L56','Lec 5&6',20,'easy',"The basic backbone of most fat or oil molecules is an alcohol called........",["Glycerol","Glycerin","Glyceraldehyde","Glycogen"],0,"Glycerol is the backbone esterified with three fatty acids in TAGs.");
+B('L56','Lec 5&6',21,'medium',"A molecule of Linoleic acid. Which statement best describes it?",["It is a saturated fatty acid","It is an unsaturated fatty acid","It is a sterol","It is cholesterol"],1,"Linoleic acid has double bonds (a ω-6 PUFA).");
+B('L56','Lec 5&6',22,'hard',"Which of these statements best describes the composition of lipids?",["C, H, O in the ration of 1:2:1","C, H, O in no specific ratio","C, H, O, N, P all present","None of the above"],1,"Unlike carbohydrates (CH₂O)n, lipids contain C, H and O in no fixed ratio.");
+B('L56','Lec 5&6',23,'medium',"The kink or bend that a double bond causes in a fat result in what phase at room temperature?",["Solid fats","Wax","Oils","Margarine"],2,"Cis double-bond kinks prevent tight packing, so unsaturated fats are liquid oils.");
+B('L56','Lec 5&6',24,'medium',"Oleic acid is ………….",["Saturated fatty acid","PUFA","Unsaturated fatty acid","A steroid"],2,"Oleic acid has one double bond — a monounsaturated fatty acid, not a PUFA.");
+B('L56','Lec 5&6',25,'medium',"Palmitic acid is ……..….",["Saturated fatty acid","PUFA","Unsaturated fatty acid","A steroid"],0,"Palmitic acid (C16:0) has no double bonds.");
+B('L56','Lec 5&6',26,'medium',"Butter is neutral fat made up of…………",["Saturated fatty acids","PUFA","Unsaturated fatty acid","A steroid"],0,"Animal fats like butter are rich in saturated fatty acids, hence solid.");
+B('L56','Lec 5&6',27,'hard',"…….…..is an essential PUFA that has ω-6 in its hydrocarbon tail",["Palmitic acid","Stearic acid","Linoleic acid","Cholesterol"],2,"Linoleic acid is the ω-6 essential fatty acid.");
+B('L56','Lec 5&6',28,'hard',"…………..is an essential PUFA that has either ω-3 or ω-6 form in its hydrocarbon tail",["Linolenic acid","Stearic acid","Palmitic acid","Cholesterol"],0,"Linolenic acid exists as α-linolenic (ω-3) and γ-linolenic (ω-6).","Duplicate option replaced.");
+B('L56','Lec 5&6',29,'medium',"A triglyceride formed by the esterification of one glycerol molecule with three molecules of palmitic acid is………….",["Tristearin","Triglycerin","Tripalmitin","Triose"],2,"Tripalmitin (1,2,3-tripalmityl glycerol) is a simple triglyceride.");
+B('L56','Lec 5&6',30,'medium',"Alkaline hydrolysis of oils with NaOH or KOH at a high temperature makes them turn into ……",["Wax","Paraffin oil","Rancid oils","Soap"],3,"Saponification: boiling fats with NaOH/KOH gives glycerol + fatty-acid salts (soaps).");
+
+/* ---------- NEW questions from lecture micro-details ---------- */
+N('L1','Lecture 1','hard',"In the adrenal cortex, the smooth endoplasmic reticulum (SER) is the site of:",["Steroid formation","Triglyceride formation","Protein glycosylation","Insulin processing"],0,"SER of intestinal cells forms triglycerides, but in the adrenal cortex SER is the site of steroid formation. Glycosylation and insulin processing happen in the Golgi.");
+N('L1','Lecture 1','hard',"Which cytoskeletal component is NOT involved in movement of the cell?",["Intermediate filaments","Microtubules (tubulin)","Actin filaments","Myosin filaments"],0,"Intermediate filaments (e.g. keratin, neurofilaments, glial filaments) give structural support but are not involved in cell movement.");
+N('L1','Lecture 1','medium',"Approximately how much water is present in a 70 kg adult male?",["42 L (≈60% of body mass)","35 L (≈50% of body mass)","28 L (≈40% of body mass)","14 L (≈20% of body mass)"],0,"A 70 kg male holds ~42 L (60%); a 70 kg female ~35 L (50%). Of the 42 L, 28 L is ICF and 14 L is ECF.");
+N('L2','Lecture 2','hard',"Which enzymes are able to interconvert D- and L-isomers of sugars?",["Isomerases","Glycosyltransferases","Hydrolases","Lipases"],0,"Isomerases interconvert D- and L-isomers; glycosyltransferases form glycosidic bonds.");
+N('L2','Lecture 2','medium',"The sugar alcohol formed by reduction of galactose is:",["Galactitol","Sorbitol","Mannitol","Glycerol"],0,"Reducing the carbonyl group gives polyols: glucose → sorbitol, galactose → galactitol, fructose → sorbitol.");
+N('L2','Lecture 2','hard',"Why is phosphorylation of sugars (e.g. glucose-6-phosphate) inside cells essential?",["It prevents diffusion of the sugar out of the cell","It converts the sugar into a reducing sugar","It forms the glycosidic bond with proteins","It converts aldoses into ketoses"],0,"Phosphoric acid esters of monosaccharides are trapped inside the cell, preventing the sugar from diffusing out.");
+N('L2','Lecture 2','hard',"Galactose and mannose are best described as:",["Isomers, but not epimers","C-2 epimers","C-4 epimers","Anomers"],0,"Glucose–galactose are C-4 epimers and glucose–mannose are C-2 epimers, but galactose and mannose differ at two carbons, so they are only isomers.");
+N('L34','Lectures 3 & 4','hard',"In amylopectin, α(1→6) branch points occur at intervals of about:",["20–30 glucose units","8–10 glucose units","3–5 glucose units","50–60 glucose units"],0,"Amylopectin branches every 20–30 units; glycogen is more highly branched (every 8–10 units).");
+N('L34','Lectures 3 & 4','medium',"Inulin, a homopolysaccharide of fructose, is used clinically to:",["Determine the glomerular filtration rate of the kidney","Maintain plasma volume","Prevent blood coagulation","Lubricate joints"],0,"Inulin measures GFR; dextran maintains plasma volume; heparin is an anticoagulant; hyaluronic acid lubricates joints.");
+N('L34','Lectures 3 & 4','hard',"A deficiency of the lysosomal enzyme acid α(1→4)-glucosidase (acid maltase) leads to:",["Accumulation of glycogen in lysosomal vacuoles","Failure to synthesize glycogen in the cytosol","Accumulation of cellulose in the intestine","Excess free glucose in the blood"],0,"About 1–3% of glycogen is degraded in lysosomes by acid maltase; its deficiency makes glycogen accumulate in lysosomal vacuoles (a lysosomal disease).");
+N('L56','Lecture 5','medium',"The type of alcohol usually found in waxes is:",["A higher alcohol such as palmityl alcohol","Glycerol","Sphingosine","A sterol"],0,"Waxes are esters of fatty acids with higher (long-chain) alcohols such as palmityl alcohol.");
+N('L56','Lecture 5','hard',"In a typical triacylglycerol, the fatty acid esterified at C-2 of glycerol is usually:",["Unsaturated","Saturated","Always palmitic acid","Replaced by a phosphate group"],0,"The C1 fatty acid is usually saturated, C2 usually unsaturated, and C3 can be either.");
+N('L56','Lecture 6','medium',"Which phospholipid acts as a lung surfactant that prevents alveolar collapse?",["Lecithin (phosphatidylcholine)","Cardiolipin","Phosphatidylinositol","Phosphatidylserine"],0,"Lecithin (PC) is the major membrane phospholipid and acts as lung surfactant.");
+N('L56','Lecture 6','hard',"Cardiolipin, a double glycerophospholipid of the inner mitochondrial membrane, is used in the diagnosis of:",["Syphilis","Diabetes mellitus","Tuberculosis","Hepatitis"],0,"Cardiolipin has immunological properties and is used in the diagnosis of syphilis.");
+N('L56','Lecture 6','hard',"What distinguishes plasmalogens from other glycerophospholipids?",["An ether (vinyl-ether) linkage at C-1 of glycerol instead of an ester linkage","Two phosphatidic acids esterified to C-1 and C-3 of glycerol","A sphingosine backbone instead of glycerol","A myo-inositol ring attached to the phosphate"],0,"Plasmalogens have an unsaturated fatty alcohol at C-1 joined by an ether bond. Platelet-activating factor is a plasmalogen.");
+N('L56','Lecture 6','medium',"Which of the following is a sphingophospholipid?",["Sphingomyelin","Lecithin","Cephalin","Cardiolipin"],0,"Sphingomyelin uses sphingosine as its alcohol and insulates nerves in the myelin sheath; the others are glycerophospholipids.");
+
+/* =====================================================================
+   3) APP LOGIC
+   ===================================================================== */
+const SCOPES = [
+  { key:'ALL', label:'All Lectures', sub:'Full course — cell biochemistry, carbohydrates & lipids' },
+  { key:'L1',  label:'Lecture 1',  sub:'Overview of cell biochemistry & body water' },
+  { key:'L2',  label:'Lecture 2',  sub:'Carbohydrates I — monosaccharides' },
+  { key:'L34', label:'Lectures 3 & 4', sub:'Carbohydrates II — di- & polysaccharides' },
+  { key:'L56', label:'Lectures 5 & 6', sub:'Lipids — simple lipids & phospholipids' }
+];
+const DIFFS = [
+  { key:'easy', label:'Easy', sub:'Core definitions', color:'bg-emerald-50 text-emerald-700' },
+  { key:'medium', label:'Medium', sub:'Concepts & comparisons', color:'bg-amber-50 text-amber-700' },
+  { key:'hard', label:'Hard', sub:'Edge cases & details', color:'bg-rose-50 text-rose-700' }
+];
+const COUNTS = [10, 20, 30, 50];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+const scopeLabel = (k) => SCOPES.find(s => s.key === k)?.label || k;
+const diffLabel = (k) => DIFFS.find(d => d.key === k)?.label || k;
+
+function showView(name) {
+  ['setup','exam','result','admin'].forEach(v => $('view-' + v).classList.toggle('hidden-view', v !== name));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ---------- Firebase init ---------- */
+const FB_ENABLED = !!FIREBASE_CONFIG.apiKey;
+let db = null, auth = null;
+if (FB_ENABLED) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(() => {});
+  } catch (e) { console.error('Firebase init failed', e); }
+}
+const LOCAL_KEY = 'bioc209_demo_results';
+const localGet = () => { try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; } };
+const localSet = (arr) => { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(arr)); } catch {} };
+
+/* ---------- Wizard ---------- */
+const setup = { step: 1, name: '', scope: 'ALL', count: 10, diff: 'medium' };
+const STEP_NAMES = ['Name', 'Scope', 'Questions', 'Difficulty'];
+
+function poolFor(scope) { return scope === 'ALL' ? QUESTIONS : QUESTIONS.filter(q => q.scope === scope); }
+
+function renderStepper() {
+  $('stepper').innerHTML = STEP_NAMES.map((n, i) => {
+    const k = i + 1, done = k < setup.step, cur = k === setup.step;
+    return `<div class="flex items-center gap-2 ${i ? 'flex-1' : ''}">
+      ${i ? `<div class="h-px flex-1 ${done || cur ? 'bg-moss-500' : 'bg-[#d9d2c3]'}"></div>` : ''}
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-full grid place-items-center text-xs font-bold ${cur ? 'bg-moss-600 text-white' : done ? 'bg-moss-100 text-moss-700' : 'bg-[#e7e2d8] text-slate-500'}">${done ? '✓' : k}</div>
+        <span class="hidden sm:inline text-sm font-medium ${cur ? 'text-ink' : 'text-slate-500'}">${n}</span>
+      </div></div>`;
+  }).join('');
+}
+
+function choiceBtn(active, inner, data) {
+  return `<button type="button" class="choice text-left rounded-xl border border-[#d9d2c3] px-4 py-3 hover:border-moss-500 ${active ? 'active' : ''}" ${data}>${inner}</button>`;
+}
+
+function renderChoices() {
+  $('scopeChoices').innerHTML = SCOPES.map(s => {
+    const n = poolFor(s.key).length;
+    return choiceBtn(setup.scope === s.key,
+      `<div class="flex justify-between items-center gap-3"><div><div class="font-semibold">${s.label}</div><div class="text-sm text-slate-500">${s.sub}</div></div><span class="chip bg-[#f6f4ef] text-slate-600 shrink-0">${n} Qs</span></div>`,
+      `data-scope="${s.key}"`);
+  }).join('');
+
+  const max = poolFor(setup.scope).length;
+  $('countHint').textContent = `${scopeLabel(setup.scope)} has ${max} questions available.`;
+  $('countChoices').innerHTML = COUNTS.map(c => {
+    const disabled = c > max;
+    return `<button type="button" ${disabled ? 'disabled' : ''} data-count="${c}" class="choice rounded-xl border border-[#d9d2c3] px-4 py-4 text-center ${setup.count === c ? 'active' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:border-moss-500'}">
+      <div class="font-display text-2xl font-bold">${c}</div><div class="text-xs text-slate-500">${disabled ? 'not enough' : 'questions'}</div></button>`;
+  }).join('') + (COUNTS.includes(max) || max > 50 ? '' :
+    `<button type="button" data-count="${max}" class="choice rounded-xl border border-[#d9d2c3] px-4 py-4 text-center hover:border-moss-500 ${setup.count === max ? 'active' : ''}"><div class="font-display text-2xl font-bold">${max}</div><div class="text-xs text-slate-500">all in scope</div></button>`);
+
+  const pool = poolFor(setup.scope);
+  $('diffChoices').innerHTML = DIFFS.map(d => {
+    const n = pool.filter(q => q.diff === d.key).length;
+    return choiceBtn(setup.diff === d.key,
+      `<div class="chip ${d.color} mb-2">${d.label}</div><div class="text-sm text-slate-600">${d.sub}</div><div class="text-xs text-slate-400 mt-1">${n} in scope</div>`,
+      `data-diff="${d.key}"`);
+  }).join('');
+
+  $('summaryBox').innerHTML = `<div class="font-semibold text-moss-700 mb-1">Ready, ${esc(setup.name || 'student')}?</div>
+    <div class="text-slate-600">${setup.count} questions · ${scopeLabel(setup.scope)} · ${diffLabel(setup.diff)}. Answer each one to see the explanation before moving on.</div>`;
+}
+
+function renderStep() {
+  document.querySelectorAll('.step').forEach(el => el.classList.toggle('hidden', +el.dataset.step !== setup.step));
+  $('backBtn').classList.toggle('invisible', setup.step === 1);
+  $('nextBtn').textContent = setup.step === 4 ? 'Start exam' : 'Continue →';
+  renderStepper(); renderChoices();
+  const w = $('welcome');
+  if (setup.step > 1 && setup.name) {
+    const first = setup.name.split(' ')[0];
+    $('welcomeTitle').textContent = `Welcome, ${first}! 👋`;
+    $('welcomeSub').textContent = {
+      2: "Great to have you here. Let's set up your BIOC 209 exam — first, pick what you want to be tested on.",
+      3: `Nice choice, ${first}. Now, how many questions are you up for?`,
+      4: `Almost there, ${first} — choose your level and let's begin. Good luck!`
+    }[setup.step];
+    w.classList.remove('hidden');
+  } else w.classList.add('hidden');
+  $('customMax').textContent = `max ${poolFor(setup.scope).length}`;
+  $('customCount').max = poolFor(setup.scope).length;
+  $('countErr').classList.add('hidden');
+  if (setup.step === 1) setTimeout(() => $('studentName').focus(), 50);
+}
+
+$('customCount').addEventListener('input', () => {
+  const v = parseInt($('customCount').value, 10), max = poolFor(setup.scope).length;
+  if (Number.isInteger(v) && v >= 1 && v <= max) { setup.count = v; $('countErr').classList.add('hidden'); renderChoices(); }
+});
+$('customCount').addEventListener('keydown', e => { if (e.key === 'Enter') $('nextBtn').click(); });
+
+document.addEventListener('click', (e) => {
+  const s = e.target.closest('[data-scope]'), c = e.target.closest('[data-count]'), d = e.target.closest('[data-diff]');
+  if (s) { setup.scope = s.dataset.scope; const max = poolFor(setup.scope).length; if (setup.count > max) setup.count = COUNTS.filter(x => x <= max).pop() || max; renderChoices(); }
+  if (s) { const v = parseInt($('customCount').value, 10); if (v > poolFor(setup.scope).length) $('customCount').value = ''; }
+  if (c && !c.disabled) { setup.count = +c.dataset.count; $('customCount').value = ''; $('countErr').classList.add('hidden'); renderChoices(); }
+  if (d) { setup.diff = d.dataset.diff; renderChoices(); }
+});
+
+$('nextBtn').onclick = async () => {
+  if (setup.step === 1) {
+    const raw = $('studentName').value.trim();
+    if (raw && (await sha256(raw)) === PASS_HASH) { await unlockAdmin(raw); return; }
+    const n = raw.replace(/\s+/g, ' ');
+    if (n.length < 3) { $('nameErr').textContent = 'Please enter your name (at least 3 characters).'; $('nameErr').classList.remove('hidden'); return; }
+    $('nameErr').classList.add('hidden'); setup.name = n;
+  }
+  if (setup.step === 3 && $('customCount').value !== '') {
+    const v = Number($('customCount').value), max = poolFor(setup.scope).length;
+    if (!Number.isInteger(v) || v < 1 || v > max) {
+      $('countErr').textContent = `Please enter a whole number between 1 and ${max}.`;
+      $('countErr').classList.remove('hidden'); return;
+    }
+    setup.count = v;
+  }
+  if (setup.step < 4) { setup.step++; renderStep(); } else startExam();
+};
+$('backBtn').onclick = () => { if (setup.step > 1) { setup.step--; renderStep(); } };
+$('studentName').addEventListener('keydown', e => { if (e.key === 'Enter') $('nextBtn').click(); });
+
+/* ---------- Question selection (≈87% bank / ≈13% lecture) ---------- */
+function buildExam(scope, count, diff) {
+  const pool = poolFor(scope);
+  const order = { easy: ['easy','medium','hard'], medium: ['medium','easy','hard'], hard: ['hard','medium','easy'] }[diff];
+  const rank = (q) => order.indexOf(q.diff);
+  const pick = (list, n) => shuffle(list).sort((a, b) => rank(a) - rank(b)).slice(0, n);
+  const bank = pool.filter(q => q.src === 'bank'), lec = pool.filter(q => q.src === 'lecture');
+  let nLec = Math.min(lec.length, Math.max(count >= 8 ? 1 : 0, Math.round(count * LECTURE_SHARE)));
+  let nBank = Math.min(bank.length, count - nLec);
+  nLec = Math.min(lec.length, count - nBank);
+  const chosen = [...pick(bank, nBank), ...pick(lec, nLec)];
+  return shuffle(chosen).map(q => {
+    // shuffle options unless an option refers to the others ("All the above", "None of these"…)
+    const fixed = q.o.some(t => /all (of )?(the|these)|none of|above/i.test(t));
+    const idx = fixed ? q.o.map((_, i) => i) : shuffle(q.o.map((_, i) => i));
+    return { ...q, opts: idx.map(i => q.o[i]), ans: idx.indexOf(q.a) };
+  });
+}
+
+/* ---------- Exam mode ---------- */
+let exam = null, timerInt = null;
+
+function startExam() {
+  exam = { qs: buildExam(setup.scope, setup.count, setup.diff), i: 0, score: 0, answers: [], start: Date.now(), selected: null, submitted: false, saved: false };
+  $('qTotal').textContent = exam.qs.length;
+  $('liveScore').textContent = '0';
+  clearInterval(timerInt);
+  timerInt = setInterval(() => { $('timer').textContent = fmtTime(Math.floor((Date.now() - exam.start) / 1000)); }, 1000);
+  $('timer').textContent = '00:00';
+  showView('exam'); renderQuestion();
+}
+
+function renderQuestion() {
+  const q = exam.qs[exam.i];
+  exam.selected = null; exam.submitted = false;
+  $('qNum').textContent = exam.i + 1;
+  $('progressBar').style.width = `${(exam.i / exam.qs.length) * 100}%`;
+  const d = DIFFS.find(x => x.key === q.diff);
+  $('qTags').innerHTML =
+    `<span class="chip ${q.src === 'bank' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700'}">${q.src === 'bank' ? '📘' : '🎓'} ${esc(q.tag)}</span>
+     <span class="chip ${d.color}">${d.label}</span>
+     <span class="chip bg-[#f6f4ef] text-slate-600">${esc(scopeLabel(q.scope))}</span>`;
+  $('qText').textContent = q.q;
+  $('qOptions').innerHTML = q.opts.map((o, i) =>
+    `<button type="button" class="opt w-full text-left rounded-xl border border-[#d9d2c3] px-4 py-3 flex gap-3 items-start" data-opt="${i}">
+       <span class="w-7 h-7 shrink-0 rounded-lg bg-[#f6f4ef] grid place-items-center text-sm font-bold">${String.fromCharCode(97 + i)}</span>
+       <span class="pt-0.5">${esc(o)}</span></button>`).join('');
+  $('feedback').className = 'hidden mt-5 rounded-xl p-4 text-sm leading-relaxed';
+  $('submitBtn').classList.remove('hidden'); $('submitBtn').disabled = true;
+  $('nextQBtn').classList.add('hidden');
+  const card = $('qCard'); card.classList.remove('fade'); void card.offsetWidth; card.classList.add('fade');
+}
+
+$('qOptions').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-opt]'); if (!b || exam.submitted) return;
+  exam.selected = +b.dataset.opt;
+  document.querySelectorAll('#qOptions .opt').forEach(el => el.classList.toggle('sel', el === b));
+  $('submitBtn').disabled = false;
+});
+
+$('submitBtn').onclick = () => {
+  if (exam.selected === null || exam.submitted) return;
+  exam.submitted = true;
+  const q = exam.qs[exam.i], ok = exam.selected === q.ans;
+  if (ok) exam.score++;
+  exam.answers.push({ q, chosen: exam.selected, ok });
+  $('liveScore').textContent = exam.score;
+  document.querySelectorAll('#qOptions .opt').forEach((el, i) => {
+    el.disabled = true; el.classList.remove('sel');
+    if (i === q.ans) el.classList.add('ok'); else if (i === exam.selected) el.classList.add('bad');
+  });
+  const fb = $('feedback');
+  fb.className = `mt-5 rounded-xl p-4 text-sm leading-relaxed fade ${ok ? 'bg-green-50 border border-green-200 text-green-900' : 'bg-red-50 border border-red-200 text-red-900'}`;
+  const first = esc(setup.name.split(' ')[0]);
+  const praise = ['Well done', 'Great job', 'Spot on', 'Excellent', 'Nice work'][Math.floor(Math.random() * 5)];
+  const nudge = ['Not quite', 'Close one', 'Not this time'][Math.floor(Math.random() * 3)];
+  fb.innerHTML = `<div class="font-bold mb-1">${ok ? `✓ ${praise}, ${first}! That's correct.` : `✗ ${nudge}, ${first} — the answer is (${String.fromCharCode(97 + q.ans)}) ${esc(q.opts[q.ans])}`}</div>
+    <div>${esc(q.e)}</div>${q.note ? `<div class="mt-2 text-xs opacity-75">Note: ${esc(q.note)}</div>` : ''}`;
+  $('submitBtn').classList.add('hidden');
+  $('nextQBtn').classList.remove('hidden');
+  $('nextQBtn').textContent = exam.i === exam.qs.length - 1 ? 'Finish & see results →' : 'Next question →';
+  $('progressBar').style.width = `${((exam.i + 1) / exam.qs.length) * 100}%`;
+  $('nextQBtn').focus();
+};
+
+$('nextQBtn').onclick = () => { if (exam.i < exam.qs.length - 1) { exam.i++; renderQuestion(); } else finishExam(); };
+
+/* ---------- Results ---------- */
+function finishExam() {
+  clearInterval(timerInt);
+  const total = exam.qs.length, pct = Math.round((exam.score / total) * 1000) / 10;
+  const dur = Math.floor((Date.now() - exam.start) / 1000);
+  exam.result = { studentName: setup.name, scope: setup.scope, scopeLabel: scopeLabel(setup.scope), difficulty: setup.diff,
+                  score: exam.score, total, percentage: pct, durationSec: dur };
+  $('resName').textContent = setup.name;
+  $('resPct').textContent = pct + '%';
+  $('resPct').className = `font-display text-6xl font-bold mt-2 ${pct >= 75 ? 'text-moss-600' : pct >= 50 ? 'text-amber-600' : 'text-red-600'}`;
+  $('resScore').textContent = `${exam.score} of ${total} correct`;
+  const fn = setup.name.split(' ')[0];
+  $('resMsg').textContent = pct >= 90 ? `Outstanding, ${fn}!` : pct >= 75 ? `Great work, ${fn}!` : pct >= 50 ? `You passed, ${fn} — keep revising` : `Keep going, ${fn} — more revision needed`;
+  $('resScope').textContent = scopeLabel(setup.scope);
+  $('resDiff').textContent = diffLabel(setup.diff);
+  $('resTime').textContent = fmtTime(dur);
+  $('reviewList').classList.add('hidden'); $('reviewToggle').textContent = 'Review answers';
+  $('reviewList').innerHTML = exam.answers.map((a, n) => `
+    <div class="card p-5 border-l-4 ${a.ok ? 'border-l-green-500' : 'border-l-red-500'}">
+      <div class="flex flex-wrap gap-2 mb-2"><span class="chip bg-[#f6f4ef] text-slate-600">Q${n + 1}</span><span class="chip ${a.q.src === 'bank' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700'}">${esc(a.q.tag)}</span></div>
+      <div class="font-semibold mb-2">${esc(a.q.q)}</div>
+      <div class="text-sm">${a.ok ? '' : `<div class="text-red-700">Your answer: ${esc(a.q.opts[a.chosen])}</div>`}<div class="text-green-700">Correct: ${esc(a.q.opts[a.q.ans])}</div></div>
+      <div class="text-sm text-slate-600 mt-2">${esc(a.q.e)}</div>
+    </div>`).join('');
+  showView('result');
+  saveResult();
+}
+
+async function saveResult() {
+  const st = $('saveStatus');
+  st.innerHTML = `<span class="text-slate-500">Saving your result…</span>`;
+  try {
+    if (FB_ENABLED && db) {
+      await db.collection(COLLECTION).add({ ...exam.result,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(), clientTime: new Date().toISOString() });
+    } else {
+      const arr = localGet(); arr.push({ ...exam.result, id: 'local-' + Date.now(), timestamp: new Date().toISOString() }); localSet(arr);
+    }
+    exam.saved = true;
+    st.innerHTML = `<span class="chip bg-green-50 text-green-700">✓ Result submitted${FB_ENABLED ? '' : ' (demo mode — saved in this browser only)'}</span>`;
+  } catch (err) {
+    console.error(err);
+    st.innerHTML = `<span class="text-red-600">Couldn't submit your result (${esc(err.code || err.message)}).</span>
+      <button id="retrySave" class="ml-2 underline font-semibold text-ink">Try again</button>`;
+    $('retrySave').onclick = saveResult;
+  }
+}
+
+$('reviewToggle').onclick = () => {
+  const h = $('reviewList').classList.toggle('hidden');
+  $('reviewToggle').textContent = h ? 'Review answers' : 'Hide review';
+};
+$('restartBtn').onclick = () => { setup.step = 2; showView('setup'); renderStep(); };
+
+/* ---------- Admin ---------- */
+let adminUnsub = null, adminRows = [], adminUnlocked = false;
+
+async function sha256(t) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function unlockAdmin(pass) {
+  $('studentName').value = '';
+  $('nextBtn').disabled = true;
+  try {
+    if (FB_ENABLED && auth) await auth.signInWithEmailAndPassword(ADMIN_EMAIL, pass);
+    adminUnlocked = true;
+    clearInterval(timerInt);
+    openAdmin();
+  } catch (e) {
+    console.error(e);
+    $('nameErr').textContent = 'Something went wrong. Please try again.';
+    $('nameErr').classList.remove('hidden');
+  } finally {
+    $('nextBtn').disabled = false;
+  }
+}
+
+function openAdmin() {
+  showView('admin');
+  $('adminMode').textContent = FB_ENABLED ? 'Connected to Firebase Firestore — updates appear in real time.' : 'Demo mode — showing results stored in this browser only. Add your Firebase config to collect results from all students.';
+  if (adminUnsub) return;
+  if (FB_ENABLED && db) {
+    adminUnsub = db.collection(COLLECTION).orderBy('timestamp', 'desc').onSnapshot(snap => {
+      adminRows = snap.docs.map(d => { const x = d.data(); return { ...x, id: d.id, ts: x.timestamp?.toDate ? x.timestamp.toDate() : new Date(x.clientTime || Date.now()) }; });
+      renderAdmin();
+    }, err => { $('adminMode').textContent = 'Permission denied or connection error: ' + (err.code || err.message); });
+  } else {
+    const load = () => { adminRows = localGet().map(x => ({ ...x, ts: new Date(x.timestamp) })).sort((a, b) => b.ts - a.ts); renderAdmin(); };
+    load();
+    const onStorage = (e) => { if (e.key === LOCAL_KEY) load(); };
+    window.addEventListener('storage', onStorage);
+    adminUnsub = () => window.removeEventListener('storage', onStorage);
+  }
+}
+
+function renderAdmin() {
+  const term = $('adminSearch').value.trim().toLowerCase();
+  const rows = adminRows.filter(r => !term || String(r.studentName).toLowerCase().includes(term));
+  const unique = new Set(adminRows.map(r => String(r.studentName).trim().toLowerCase()));
+  $('stTakers').textContent = unique.size;
+  $('stAttempts').textContent = adminRows.length;
+  $('stAvg').textContent = adminRows.length ? (adminRows.reduce((s, r) => s + (+r.percentage || 0), 0) / adminRows.length).toFixed(1) + '%' : '–';
+  $('stPass').textContent = adminRows.length ? Math.round(adminRows.filter(r => r.percentage >= 50).length / adminRows.length * 100) + '%' : '–';
+  $('adminEmpty').classList.toggle('hidden', rows.length > 0);
+  $('adminRows').innerHTML = rows.map((r, i) => {
+    const p = +r.percentage || 0;
+    return `<tr class="border-t border-[#efeae0] hover:bg-[#faf8f4]">
+      <td class="px-4 py-3 text-slate-400">${i + 1}</td>
+      <td class="px-4 py-3 font-semibold">${esc(r.studentName)}</td>
+      <td class="px-4 py-3 text-slate-600 whitespace-nowrap">${esc(r.ts.toLocaleString())}</td>
+      <td class="px-4 py-3">${esc(r.scopeLabel || scopeLabel(r.scope))}</td>
+      <td class="px-4 py-3">${esc(diffLabel(r.difficulty))}</td>
+      <td class="px-4 py-3 text-right tabular-nums">${esc(r.score)}/${esc(r.total)}</td>
+      <td class="px-4 py-3 text-right"><span class="chip ${p >= 75 ? 'bg-green-50 text-green-700' : p >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}">${p}%</span></td>
+    </tr>`;
+  }).join('');
+}
+$('adminSearch').addEventListener('input', renderAdmin);
+
+$('exportCsv').onclick = () => {
+  const head = ['Student','Date','Scope','Difficulty','Score','Total','Percentage','Duration (s)'];
+  const cell = (v) => { let s = String(v ?? ''); if (/^[=+\-@]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; };
+  const lines = [head.map(cell).join(',')].concat(adminRows.map(r => [r.studentName, r.ts.toISOString(), r.scopeLabel || r.scope, diffLabel(r.difficulty), r.score, r.total, r.percentage, r.durationSec].map(cell).join(',')));
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `bioc209_results_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+$('adminLogout').onclick = async () => {
+  if (typeof adminUnsub === 'function') adminUnsub();
+  adminUnsub = null; adminRows = []; adminUnlocked = false;
+  $('adminRows').innerHTML = '';
+  if (FB_ENABLED && auth) { try { await auth.signOut(); } catch {} }
+  setup.step = 1; $('studentName').value = ''; showView('setup'); renderStep();
+};
+
+/* ---------- boot ---------- */
+renderStep();
+</script>
+</body>
+</html>
