@@ -169,7 +169,6 @@
           <div class="rounded-xl bg-[#f6f4ef] p-3"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Difficulty</div><div class="font-semibold text-sm mt-0.5" id="resDiff"></div></div>
           <div class="rounded-xl bg-[#f6f4ef] p-3"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Time taken</div><div class="font-semibold text-sm mt-0.5" id="resTime"></div></div>
         </div>
-        <div id="saveStatus" class="mt-6 text-sm"></div>
         <div class="flex flex-wrap gap-3 justify-center mt-6">
           <button id="reviewToggle" class="px-5 py-2.5 rounded-xl border border-[#d9d2c3] hover:bg-[#f6f4ef] font-semibold">Review answers</button>
           <button id="restartBtn" class="px-5 py-2.5 rounded-xl bg-moss-600 hover:bg-moss-700 text-white font-semibold">Take another exam</button>
@@ -676,24 +675,35 @@ function finishExam() {
   saveResult();
 }
 
-async function saveResult() {
-  const st = $('saveStatus');
-  st.innerHTML = `<span class="text-slate-500">Saving your result…</span>`;
-  try {
-    if (FB_ENABLED && db) {
-      await db.collection(COLLECTION).add({ ...exam.result,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(), clientTime: new Date().toISOString() });
-    } else {
-      const arr = localGet(); arr.push({ ...exam.result, id: 'local-' + Date.now(), timestamp: new Date().toISOString() }); localSet(arr);
-    }
-    exam.saved = true;
-    st.innerHTML = `<span class="chip bg-green-50 text-green-700">✓ Result submitted${FB_ENABLED ? '' : ' (demo mode — saved in this browser only)'}</span>`;
-  } catch (err) {
-    console.error(err);
-    st.innerHTML = `<span class="text-red-600">Couldn't submit your result (${esc(err.code || err.message)}).</span>
-      <button id="retrySave" class="ml-2 underline font-semibold text-ink">Try again</button>`;
-    $('retrySave').onclick = saveResult;
+/* Results are saved silently — nothing is shown to the student.
+   If sending fails, it retries a few times, then keeps the result in this
+   browser and re-sends it the next time the page is opened. */
+const PENDING_KEY = 'bioc209_pending';
+const pendingGet = () => { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; } };
+const pendingSet = (a) => { try { localStorage.setItem(PENDING_KEY, JSON.stringify(a)); } catch {} };
+
+async function sendOne(rec) {
+  if (FB_ENABLED && db) {
+    await db.collection(COLLECTION).add({ ...rec, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+  } else {
+    const arr = localGet(); arr.push({ ...rec, id: 'local-' + Date.now(), timestamp: rec.clientTime }); localSet(arr);
   }
+}
+
+async function saveResult() {
+  const rec = { ...exam.result, clientTime: new Date().toISOString() };
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try { await sendOne(rec); exam.saved = true; return; }
+    catch (err) { console.warn('save attempt failed', err); await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); }
+  }
+  const p = pendingGet(); p.push(rec); pendingSet(p);
+}
+
+async function flushPending() {
+  const p = pendingGet(); if (!p.length) return;
+  const left = [];
+  for (const rec of p) { try { await sendOne(rec); } catch { left.push(rec); } }
+  pendingSet(left);
 }
 
 $('reviewToggle').onclick = () => {
@@ -788,6 +798,7 @@ $('adminLogout').onclick = async () => {
 
 /* ---------- boot ---------- */
 renderStep();
+flushPending();
 </script>
 </body>
 </html>
