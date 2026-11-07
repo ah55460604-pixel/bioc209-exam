@@ -46,7 +46,7 @@
 <header class="sticky top-0 z-30 bg-[#f6f4ef]/90 backdrop-blur border-b border-[#e7e2d8]">
   <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl bg-moss-600 text-white grid place-items-center font-display font-bold">B</div>
+      <div id="logo" class="w-9 h-9 rounded-xl bg-moss-600 text-white grid place-items-center font-display font-bold select-none">B</div>
       <div>
         <div class="font-display font-bold leading-tight">BIOC 209 Exam Center</div>
         <div class="text-xs text-slate-500 leading-tight">Biochemistry · Merit University</div>
@@ -68,23 +68,15 @@
       <!-- stepper -->
       <div class="flex items-center gap-2 mb-5" id="stepper"></div>
 
-      <!-- welcome banner (shown after the name is entered) -->
-      <div id="welcome" class="hidden mb-5 rounded-2xl bg-moss-600 text-white px-6 py-5 fade">
+      <!-- welcome banner -->
+      <div id="welcome" class="mb-5 rounded-2xl bg-moss-600 text-white px-6 py-5 fade">
         <div class="font-display text-2xl font-bold" id="welcomeTitle"></div>
         <div class="text-moss-50 mt-1 text-sm" id="welcomeSub"></div>
       </div>
 
       <div class="card p-6 sm:p-8">
-        <!-- Step 1 -->
-        <div data-step="1" class="step">
-          <h2 class="font-display text-xl font-bold mb-4">What should we call you?</h2>
-          <input id="studentName" type="text" maxlength="60" autocomplete="name" placeholder="Name"
-            class="w-full rounded-xl border border-[#d9d2c3] px-4 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-moss-100 focus:border-moss-500">
-          <p id="nameErr" class="text-sm text-red-600 mt-2 hidden">Please enter your name (at least 3 characters).</p>
-        </div>
-
-        <!-- Step 2 -->
-        <div data-step="2" class="step hidden">
+        <!-- Step 2 (first step) -->
+        <div data-step="2" class="step">
           <h2 class="font-display text-xl font-bold mb-1">Choose the scope</h2>
           <p class="text-sm text-slate-500 mb-4">Test yourself on one lecture or the whole course.</p>
           <div id="scopeChoices" class="grid gap-3"></div>
@@ -160,7 +152,7 @@
   <section id="view-result" class="hidden-view">
     <div class="max-w-3xl mx-auto">
       <div class="card p-6 sm:p-10 text-center fade">
-        <div class="text-sm text-slate-500" id="resName"></div>
+        <div class="text-sm text-slate-500">Your score</div>
         <div class="font-display text-6xl font-bold mt-2" id="resPct">0%</div>
         <div class="text-slate-600 mt-1" id="resScore"></div>
         <div class="mt-3 inline-block chip bg-moss-50 text-moss-700" id="resMsg"></div>
@@ -192,21 +184,21 @@
       </div>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-      <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Test-takers</div><div class="font-display text-3xl font-bold" id="stTakers">0</div><div class="text-xs text-slate-400">unique names</div></div>
+      <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Test-takers</div><div class="font-display text-3xl font-bold" id="stTakers">0</div><div class="text-xs text-slate-400">unique devices</div></div>
       <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Attempts</div><div class="font-display text-3xl font-bold" id="stAttempts">0</div><div class="text-xs text-slate-400">exams submitted</div></div>
       <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Average</div><div class="font-display text-3xl font-bold" id="stAvg">–</div><div class="text-xs text-slate-400">mean percentage</div></div>
       <div class="card p-4"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Pass rate</div><div class="font-display text-3xl font-bold" id="stPass">–</div><div class="text-xs text-slate-400">scored ≥ 50%</div></div>
     </div>
     <div class="card overflow-hidden">
       <div class="p-4 border-b border-[#e7e2d8] flex flex-wrap gap-3 items-center justify-between">
-        <input id="adminSearch" placeholder="Search by student name…" class="rounded-lg border border-[#d9d2c3] px-3 py-2 text-sm w-full sm:w-72 focus:outline-none focus:ring-4 focus:ring-moss-100">
+        <input id="adminSearch" placeholder="Search by student ID…" class="rounded-lg border border-[#d9d2c3] px-3 py-2 text-sm w-full sm:w-72 focus:outline-none focus:ring-4 focus:ring-moss-100">
         <div class="flex items-center gap-2 text-xs text-slate-500"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live updates</div>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="bg-[#f6f4ef] text-left text-[11px] uppercase tracking-wider text-slate-500">
             <tr>
-              <th class="px-4 py-3">#</th><th class="px-4 py-3">Student</th><th class="px-4 py-3">Date &amp; time</th>
+              <th class="px-4 py-3">#</th><th class="px-4 py-3">Student ID</th><th class="px-4 py-3">Date &amp; time</th>
               <th class="px-4 py-3">Scope</th><th class="px-4 py-3">Difficulty</th><th class="px-4 py-3 text-right">Score</th><th class="px-4 py-3 text-right">%</th>
             </tr>
           </thead>
@@ -218,6 +210,16 @@
   </section>
 </main>
 
+<!-- hidden code box -->
+<div id="codeBox" class="hidden fixed inset-0 z-50 bg-ink/40 grid place-items-center p-4">
+  <div class="card w-full max-w-xs p-5 fade">
+    <input id="codeInput" type="password" autocomplete="off" placeholder="Code"
+      class="w-full rounded-xl border border-[#d9d2c3] px-4 py-3 focus:outline-none focus:ring-4 focus:ring-moss-100 focus:border-moss-500">
+    <p id="codeErr" class="text-sm text-red-600 mt-2 hidden">Invalid code.</p>
+    <button id="codeGo" class="mt-3 w-full px-4 py-2.5 rounded-xl bg-ink text-white font-semibold">OK</button>
+  </div>
+</div>
+
 <!-- ===================== CONFIG + DATA + APP ===================== -->
 <script>
 /* =====================================================================
@@ -228,9 +230,9 @@
 
    SECURITY MODEL (real mode):
    - Students can only CREATE a result document (cannot read anything).
-   - There is no visible admin button. Typing the passcode into the
-     student-name field and pressing Continue opens the dashboard; in real
-     mode it also signs in to Firebase Auth as ADMIN_EMAIL with the
+   - There is no visible admin button. Tap the "B" logo 5 times quickly
+     (or open the site URL ending in #admin) to get a code box; the right
+     code opens the dashboard and, in real mode, also signs in to Firebase Auth as ADMIN_EMAIL with the
      passcode as the password, so the data is protected by Firestore rules.
    Setup:
      a) Firebase console → Authentication → enable Email/Password →
@@ -453,18 +455,24 @@ const localGet = () => { try { return JSON.parse(localStorage.getItem(LOCAL_KEY)
 const localSet = (arr) => { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(arr)); } catch {} };
 
 /* ---------- Wizard ---------- */
-const setup = { step: 1, name: '', scope: 'ALL', count: 10, diff: 'medium' };
-const STEP_NAMES = ['Name', 'Scope', 'Questions', 'Difficulty'];
+// Anonymous student ID (no names are asked). Kept per browser so repeat attempts group together.
+function studentId() {
+  const make = () => 'Student-' + Array.from({ length: 4 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('');
+  try { let id = localStorage.getItem('bioc209_sid'); if (!id) { id = make(); localStorage.setItem('bioc209_sid', id); } return id; }
+  catch { return make(); }
+}
+const setup = { step: 2, name: studentId(), scope: 'ALL', count: 10, diff: 'medium' };
+const STEP_NAMES = ['Scope', 'Questions', 'Difficulty'];
 
 function poolFor(scope) { return scope === 'ALL' ? QUESTIONS : QUESTIONS.filter(q => q.scope === scope); }
 
 function renderStepper() {
   $('stepper').innerHTML = STEP_NAMES.map((n, i) => {
-    const k = i + 1, done = k < setup.step, cur = k === setup.step;
+    const k = i + 2, done = k < setup.step, cur = k === setup.step;
     return `<div class="flex items-center gap-2 ${i ? 'flex-1' : ''}">
       ${i ? `<div class="h-px flex-1 ${done || cur ? 'bg-moss-500' : 'bg-[#d9d2c3]'}"></div>` : ''}
       <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-full grid place-items-center text-xs font-bold ${cur ? 'bg-moss-600 text-white' : done ? 'bg-moss-100 text-moss-700' : 'bg-[#e7e2d8] text-slate-500'}">${done ? '✓' : k}</div>
+        <div class="w-7 h-7 rounded-full grid place-items-center text-xs font-bold ${cur ? 'bg-moss-600 text-white' : done ? 'bg-moss-100 text-moss-700' : 'bg-[#e7e2d8] text-slate-500'}">${done ? '✓' : k - 1}</div>
         <span class="hidden sm:inline text-sm font-medium ${cur ? 'text-ink' : 'text-slate-500'}">${n}</span>
       </div></div>`;
   }).join('');
@@ -499,30 +507,24 @@ function renderChoices() {
       `data-diff="${d.key}"`);
   }).join('');
 
-  $('summaryBox').innerHTML = `<div class="font-semibold text-moss-700 mb-1">Ready, ${esc(setup.name || 'student')}?</div>
+  $('summaryBox').innerHTML = `<div class="font-semibold text-moss-700 mb-1">Ready?</div>
     <div class="text-slate-600">${setup.count} questions · ${scopeLabel(setup.scope)} · ${diffLabel(setup.diff)}. Answer each one to see the explanation before moving on.</div>`;
 }
 
 function renderStep() {
   document.querySelectorAll('.step').forEach(el => el.classList.toggle('hidden', +el.dataset.step !== setup.step));
-  $('backBtn').classList.toggle('invisible', setup.step === 1);
+  $('backBtn').classList.toggle('invisible', setup.step === 2);
   $('nextBtn').textContent = setup.step === 4 ? 'Start exam' : 'Continue →';
   renderStepper(); renderChoices();
-  const w = $('welcome');
-  if (setup.step > 1 && setup.name) {
-    const first = setup.name.split(' ')[0];
-    $('welcomeTitle').textContent = `Welcome, ${first}! 👋`;
-    $('welcomeSub').textContent = {
-      2: "Great to have you here. Let's set up your BIOC 209 exam — first, pick what you want to be tested on.",
-      3: `Nice choice, ${first}. Now, how many questions are you up for?`,
-      4: `Almost there, ${first} — choose your level and let's begin. Good luck!`
-    }[setup.step];
-    w.classList.remove('hidden');
-  } else w.classList.add('hidden');
+  $('welcomeTitle').textContent = 'Welcome! 👋';
+  $('welcomeSub').textContent = {
+    2: "Great to have you here. Let's set up your BIOC 209 exam — first, pick what you want to be tested on.",
+    3: 'Nice choice. Now, how many questions are you up for?',
+    4: "Almost there — choose your level and let's begin. Good luck!"
+  }[setup.step];
   $('customMax').textContent = `max ${poolFor(setup.scope).length}`;
   $('customCount').max = poolFor(setup.scope).length;
   $('countErr').classList.add('hidden');
-  if (setup.step === 1) setTimeout(() => $('studentName').focus(), 50);
 }
 
 $('customCount').addEventListener('input', () => {
@@ -539,14 +541,7 @@ document.addEventListener('click', (e) => {
   if (d) { setup.diff = d.dataset.diff; renderChoices(); }
 });
 
-$('nextBtn').onclick = async () => {
-  if (setup.step === 1) {
-    const raw = $('studentName').value.trim();
-    if (raw && (await sha256(raw)) === PASS_HASH) { await unlockAdmin(raw); return; }
-    const n = raw.replace(/\s+/g, ' ');
-    if (n.length < 3) { $('nameErr').textContent = 'Please enter your name (at least 3 characters).'; $('nameErr').classList.remove('hidden'); return; }
-    $('nameErr').classList.add('hidden'); setup.name = n;
-  }
+$('nextBtn').onclick = () => {
   if (setup.step === 3 && $('customCount').value !== '') {
     const v = Number($('customCount').value), max = poolFor(setup.scope).length;
     if (!Number.isInteger(v) || v < 1 || v > max) {
@@ -557,8 +552,7 @@ $('nextBtn').onclick = async () => {
   }
   if (setup.step < 4) { setup.step++; renderStep(); } else startExam();
 };
-$('backBtn').onclick = () => { if (setup.step > 1) { setup.step--; renderStep(); } };
-$('studentName').addEventListener('keydown', e => { if (e.key === 'Enter') $('nextBtn').click(); });
+$('backBtn').onclick = () => { if (setup.step > 2) { setup.step--; renderStep(); } };
 
 /* ---------- Question selection (≈87% bank / ≈13% lecture) ---------- */
 function buildExam(scope, count, diff) {
@@ -633,10 +627,9 @@ $('submitBtn').onclick = () => {
   });
   const fb = $('feedback');
   fb.className = `mt-5 rounded-xl p-4 text-sm leading-relaxed fade ${ok ? 'bg-green-50 border border-green-200 text-green-900' : 'bg-red-50 border border-red-200 text-red-900'}`;
-  const first = esc(setup.name.split(' ')[0]);
   const praise = ['Well done', 'Great job', 'Spot on', 'Excellent', 'Nice work'][Math.floor(Math.random() * 5)];
   const nudge = ['Not quite', 'Close one', 'Not this time'][Math.floor(Math.random() * 3)];
-  fb.innerHTML = `<div class="font-bold mb-1">${ok ? `✓ ${praise}, ${first}! That's correct.` : `✗ ${nudge}, ${first} — the answer is (${String.fromCharCode(97 + q.ans)}) ${esc(q.opts[q.ans])}`}</div>
+  fb.innerHTML = `<div class="font-bold mb-1">${ok ? `✓ ${praise}! That's correct.` : `✗ ${nudge} — the answer is (${String.fromCharCode(97 + q.ans)}) ${esc(q.opts[q.ans])}`}</div>
     <div>${esc(q.e)}</div>${q.note ? `<div class="mt-2 text-xs opacity-75">Note: ${esc(q.note)}</div>` : ''}`;
   $('submitBtn').classList.add('hidden');
   $('nextQBtn').classList.remove('hidden');
@@ -654,12 +647,10 @@ function finishExam() {
   const dur = Math.floor((Date.now() - exam.start) / 1000);
   exam.result = { studentName: setup.name, scope: setup.scope, scopeLabel: scopeLabel(setup.scope), difficulty: setup.diff,
                   score: exam.score, total, percentage: pct, durationSec: dur };
-  $('resName').textContent = setup.name;
   $('resPct').textContent = pct + '%';
   $('resPct').className = `font-display text-6xl font-bold mt-2 ${pct >= 75 ? 'text-moss-600' : pct >= 50 ? 'text-amber-600' : 'text-red-600'}`;
   $('resScore').textContent = `${exam.score} of ${total} correct`;
-  const fn = setup.name.split(' ')[0];
-  $('resMsg').textContent = pct >= 90 ? `Outstanding, ${fn}!` : pct >= 75 ? `Great work, ${fn}!` : pct >= 50 ? `You passed, ${fn} — keep revising` : `Keep going, ${fn} — more revision needed`;
+  $('resMsg').textContent = pct >= 90 ? 'Outstanding!' : pct >= 75 ? 'Great work!' : pct >= 50 ? 'You passed — keep revising' : 'Keep going — more revision needed';
   $('resScope').textContent = scopeLabel(setup.scope);
   $('resDiff').textContent = diffLabel(setup.diff);
   $('resTime').textContent = fmtTime(dur);
@@ -720,22 +711,35 @@ async function sha256(t) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function unlockAdmin(pass) {
-  $('studentName').value = '';
-  $('nextBtn').disabled = true;
-  try {
-    if (FB_ENABLED && auth) await auth.signInWithEmailAndPassword(ADMIN_EMAIL, pass);
-    adminUnlocked = true;
-    clearInterval(timerInt);
-    openAdmin();
-  } catch (e) {
-    console.error(e);
-    $('nameErr').textContent = 'Something went wrong. Please try again.';
-    $('nameErr').classList.remove('hidden');
-  } finally {
-    $('nextBtn').disabled = false;
-  }
+/* Hidden entry: tap the "B" logo 5 times quickly (or open the page with #admin)
+   to show a plain code box. Nothing on the page mentions it. */
+let logoTaps = [];
+$('logo').addEventListener('click', () => {
+  const now = Date.now();
+  logoTaps = logoTaps.filter(t => now - t < 3000); logoTaps.push(now);
+  if (logoTaps.length >= 5) { logoTaps = []; openCodeBox(); }
+});
+function openCodeBox() {
+  if (adminUnlocked) { openAdmin(); return; }
+  $('codeInput').value = ''; $('codeErr').classList.add('hidden');
+  $('codeBox').classList.remove('hidden'); setTimeout(() => $('codeInput').focus(), 50);
 }
+function closeCodeBox() { $('codeBox').classList.add('hidden'); }
+$('codeBox').addEventListener('click', e => { if (e.target === $('codeBox')) closeCodeBox(); });
+$('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('codeGo').click(); if (e.key === 'Escape') closeCodeBox(); });
+$('codeGo').onclick = async () => {
+  const pass = $('codeInput').value.trim();
+  $('codeGo').disabled = true;
+  try {
+    if (!pass || (await sha256(pass)) !== PASS_HASH) throw new Error('bad');
+    if (FB_ENABLED && auth) await auth.signInWithEmailAndPassword(ADMIN_EMAIL, pass);
+    adminUnlocked = true; closeCodeBox(); clearInterval(timerInt); openAdmin();
+  } catch (e) {
+    if (e.message !== 'bad') console.error(e);
+    $('codeErr').classList.remove('hidden');
+  } finally { $('codeGo').disabled = false; }
+};
+if (location.hash === '#admin') { history.replaceState(null, '', location.pathname + location.search); setTimeout(openCodeBox, 300); }
 
 function openAdmin() {
   showView('admin');
@@ -780,7 +784,7 @@ function renderAdmin() {
 $('adminSearch').addEventListener('input', renderAdmin);
 
 $('exportCsv').onclick = () => {
-  const head = ['Student','Date','Scope','Difficulty','Score','Total','Percentage','Duration (s)'];
+  const head = ['Student ID','Date','Scope','Difficulty','Score','Total','Percentage','Duration (s)'];
   const cell = (v) => { let s = String(v ?? ''); if (/^[=+\-@]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; };
   const lines = [head.map(cell).join(',')].concat(adminRows.map(r => [r.studentName, r.ts.toISOString(), r.scopeLabel || r.scope, diffLabel(r.difficulty), r.score, r.total, r.percentage, r.durationSec].map(cell).join(',')));
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -793,7 +797,7 @@ $('adminLogout').onclick = async () => {
   adminUnsub = null; adminRows = []; adminUnlocked = false;
   $('adminRows').innerHTML = '';
   if (FB_ENABLED && auth) { try { await auth.signOut(); } catch {} }
-  setup.step = 1; $('studentName').value = ''; showView('setup'); renderStep();
+  setup.step = 2; showView('setup'); renderStep();
 };
 
 /* ---------- boot ---------- */
