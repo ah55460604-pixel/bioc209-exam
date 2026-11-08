@@ -152,7 +152,7 @@
   <section id="view-result" class="hidden-view">
     <div class="max-w-3xl mx-auto">
       <div class="card p-6 sm:p-10 text-center fade">
-        <div class="text-sm text-slate-500">Your score</div>
+        <div class="text-sm text-slate-500" id="resLabel">Your score</div>
         <div class="font-display text-6xl font-bold mt-2" id="resPct">0%</div>
         <div class="text-slate-600 mt-1" id="resScore"></div>
         <div class="mt-3 inline-block chip bg-moss-50 text-moss-700" id="resMsg"></div>
@@ -162,6 +162,7 @@
           <div class="rounded-xl bg-[#f6f4ef] p-3"><div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Time taken</div><div class="font-semibold text-sm mt-0.5" id="resTime"></div></div>
         </div>
         <div class="flex flex-wrap gap-3 justify-center mt-6">
+          <button id="retryWrongBtn" class="hidden px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold"></button>
           <button id="reviewToggle" class="px-5 py-2.5 rounded-xl border border-[#d9d2c3] hover:bg-[#f6f4ef] font-semibold">Review answers</button>
           <button id="restartBtn" class="px-5 py-2.5 rounded-xl bg-moss-600 hover:bg-moss-700 text-white font-semibold">Take another exam</button>
         </div>
@@ -565,8 +566,12 @@ function buildExam(scope, count, diff) {
   let nBank = Math.min(bank.length, count - nLec);
   nLec = Math.min(lec.length, count - nBank);
   const chosen = [...pick(bank, nBank), ...pick(lec, nLec)];
-  return shuffle(chosen).map(q => {
-    // shuffle options unless an option refers to the others ("All the above", "None of these"…)
+  return prepareQs(chosen);
+}
+
+// shuffle question order and options (unless an option refers to the others: "All the above", "None of these"…)
+function prepareQs(list) {
+  return shuffle(list).map(q => {
     const fixed = q.o.some(t => /all (of )?(the|these)|none of|above/i.test(t));
     const idx = fixed ? q.o.map((_, i) => i) : shuffle(q.o.map((_, i) => i));
     return { ...q, opts: idx.map(i => q.o[i]), ans: idx.indexOf(q.a) };
@@ -576,8 +581,10 @@ function buildExam(scope, count, diff) {
 /* ---------- Exam mode ---------- */
 let exam = null, timerInt = null;
 
-function startExam() {
-  exam = { qs: buildExam(setup.scope, setup.count, setup.diff), i: 0, score: 0, answers: [], start: Date.now(), selected: null, submitted: false, saved: false };
+function startExam(retryQs) {
+  const isRetry = Array.isArray(retryQs);
+  exam = { qs: isRetry ? prepareQs(retryQs) : buildExam(setup.scope, setup.count, setup.diff), isRetry,
+           i: 0, score: 0, answers: [], start: Date.now(), selected: null, submitted: false, saved: false };
   $('qTotal').textContent = exam.qs.length;
   $('liveScore').textContent = '0';
   clearInterval(timerInt);
@@ -662,9 +669,18 @@ function finishExam() {
       <div class="text-sm">${a.ok ? '' : `<div class="text-red-700">Your answer: ${esc(a.q.opts[a.chosen])}</div>`}<div class="text-green-700">Correct: ${esc(a.q.opts[a.q.ans])}</div></div>
       <div class="text-sm text-slate-600 mt-2">${esc(a.q.e)}</div>
     </div>`).join('');
+  // retry rounds are practice: not saved, and labelled on the result screen
+  $('resLabel').textContent = exam.isRetry ? 'Retry round — your score' : 'Your score';
+  const wrong = exam.answers.filter(a => !a.ok).map(a => QUESTIONS.find(x => x.id === a.q.id));
+  exam.wrong = wrong;
+  const rb = $('retryWrongBtn');
+  rb.classList.toggle('hidden', wrong.length === 0);
+  rb.textContent = `↻ Retry the ${wrong.length} I got wrong`;
   showView('result');
-  saveResult();
+  if (!exam.isRetry) saveResult();
 }
+
+$('retryWrongBtn').onclick = () => { if (exam && exam.wrong && exam.wrong.length) startExam(exam.wrong); };
 
 /* Results are saved silently — nothing is shown to the student.
    If sending fails, it retries a few times, then keeps the result in this
